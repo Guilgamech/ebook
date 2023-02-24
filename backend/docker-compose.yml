@@ -1,0 +1,60 @@
+version: '3'
+
+services:
+  django:
+    build: .
+    command: python manage.py runserver 0.0.0.0:7000
+    volumes:
+      - ./:/code
+    ports:
+      - "7000:7000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.setting.local
+    container_name: ebook
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    container_name: ebook_redis
+
+  celery:
+    restart: always
+    build: .
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - ./:/code
+    depends_on:
+      - redis
+      - django
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.setting.local
+    container_name: ebook_celery_worker
+
+  celery-beat:
+      environment:
+          - DJANGO_SETTINGS_MODULE=config.setting.local
+      build: .
+      command: celery -A config beat -l info
+      volumes:
+        - ./:/code
+      depends_on:
+          - redis
+          - django
+      container_name: ebook_celery_beat
+
+  flower:
+      environment:
+          - DJANGO_SETTINGS_MODULE=config.setting.local
+      build: .
+      command: celery -A config flower  --broker=redis://ebook_redis:6379//
+      ports:
+          - 5555:5555
+      depends_on:
+          - django
+          - redis
+          - celery
+      container_name: ebook_flower
+
+
+
